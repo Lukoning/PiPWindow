@@ -97,24 +97,27 @@ async function loadPiP(isToPiP=true) {
         if (q(".m-pinfo [data-log-type='dj']")) {return}
         let l = ".rnp-lyrics-line", o = `${l}-original`, k = `${l}-karaoke`, t = `${l}-translated`
         try {
-            lyrics["M0"] = q(".m-lyric .s-fc0").textContent
-            lyrics["T0"] = q(".m-lyric .s-fc3").textContent
-        }catch{
-            lyrics["M0"] = q(".m-lyric p").textContent
-        }
-        for (i = 0; i <= 4; i++) {
-            try {
+            for (i = 0; i <= 4; i++) {
                 try {
-                    lyrics[`M${i}`] = q(`${l}[offset='${i}'] ${o}`).textContent;
+                    try {
+                        lyrics[`M${i}`] = q(`${l}[offset='${i}'] ${o}`).textContent;
+                    } catch {
+                        lyrics[`M${i}`] = q(`${l}[offset='${i}'] ${k}`).textContent;
+                    }
+                    lyrics[`T${i}`] = q(`${l}[offset='${i}'] ${t}`).textContent;
                 } catch {
-                    lyrics[`M${i}`] = q(`${l}[offset='${i}'] ${k}`).textContent;
+                    if (q(`${l}.rnp-interlude[offset='${i}']`)) {
+                        lyrics[`M${i}`] = " · · · ";
+                        lyrics[`T${i}`] = "";
+                    }
                 }
-                lyrics[`T${i}`] = q(`${l}[offset='${i}'] ${t}`).textContent;
-            } catch {
-                if (q(`${l}.rnp-interlude[offset='${i}']`)) {
-                    lyrics[`M${i}`] = " · · · ";
-                    lyrics[`T${i}`] = "";
-                }
+            }
+        } catch {
+            try {
+                lyrics["M0"] = q(".m-lyric .s-fc0").textContent
+                lyrics["T0"] = q(".m-lyric .s-fc3").textContent
+            }catch{
+                lyrics["M0"] = q(".m-lyric p").textContent
             }
         }
     }
@@ -203,19 +206,6 @@ async function loadPiP(isToPiP=true) {
     cC.fillRect(pbMgL, pbMgT, (c.width-pbMgL)*tP, 5); /*进度条*/
 
     let lrcFS = 55, lrcMgT = 45, lrcMgL = 15;
-    /*for (i = 1, n = 2; i <= 3; i++, n=n+2) {
-        if (i==1) {
-            cC.fillStyle = textC; cC.font = `bold ${lrcFS}px "Microsoft YaHei"`;
-            cC.fillText(lrcM, lrcMgL, cvSize+lrcFS*i+30); /*主歌词
-            cC.fillStyle = textCT56; cC.font = `${lrcFS-5}px "Microsoft YaHei"`;
-            cC.fillText(T, lrcMgL, cvSize+lrcFS*n+40); /*翻译歌词
-        } else {
-            cC.fillStyle = textCT56; cC.font = `bold ${lrcFS-10}px "Microsoft YaHei"`;
-            cC.fillText(eval(`M${i}`), lrcMgL, cvSize+lrcFS*i+60); /*下句主歌词
-            cC.fillStyle = textCT31; cC.font = `${lrcFS-15}px "Microsoft YaHei"`;
-            cC.fillText(eval(`M${i}`), lrcMgL, cvSize+lrcFS*n+60); /*下句翻译歌词
-        }
-    }*/
     let lrcTop = cvSize+lrcMgT;
     cC.fillStyle = textC; cC.font = `bold ${lrcFS}px "Microsoft YaHei"`;
     cC.fillText(lyrics["M0"], lrcMgL, lrcTop+lrcFS); /*主歌词*/
@@ -294,12 +284,11 @@ async function load() {
     });
 }
 
-plugin.onAllPluginsLoaded(() => { //插件初始化
+plugin.onAllPluginsLoaded(() => {
     load();
 });
 
 plugin.onConfig( () => {
-    //创建DOM
     let crCfgPage = document.createElement("div");
     crCfgPage.setAttribute("id", "PiPWSettings");
     crCfgPage.innerHTML = `
@@ -352,7 +341,7 @@ border: 0 solid;
 <div>
 <p>PiPWindow</p>
 <br />
-<p>v0.0.1 by </p>
+<p>v0.0.2 by </p>
 <input class="link" type="button" onclick="betterncm.ncm.openUrl('https://github.com/Lukoning')" value=" Lukoning " />
 </div>
 <p>开发ing</p>
