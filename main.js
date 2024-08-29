@@ -48,7 +48,7 @@ async function loadPiP(isToPiP=true) {
     }catch{}
 
     /*歌手*/
-    let saE = qAll(".m-pinfo .bar > .j-title a"), sa = "";
+    let saE = qAll(".m-pinfo .bar > .j-title span:first-child *"), sa = "";
     if (saE.length != 0) {
         for (i=0; i<saE.length; i++, sa=sa+"／") {
             sa = sa + saE[i].textContent;
@@ -64,7 +64,7 @@ async function loadPiP(isToPiP=true) {
     getTime();
     function getTime() {
         try {
-            t = q(".time-indicator-container").textContent.replace(/ \/ /, "／")
+            t = q(".m-player:not(.f-dn) .time-indicator-container").textContent.replace(/ \/ /, "／")
         }catch{try{
             if (JSON.parse(localStorage.getItem("refined-now-playing-refined-control-bar"))) {
                 t = `${q("#rnp-time-passed").textContent}／${q("#rnp-time-rest").textContent}`
@@ -104,11 +104,19 @@ async function loadPiP(isToPiP=true) {
                     } catch {
                         lyrics[`M${i}`] = q(`${l}[offset='${i}'] ${k}`).textContent;
                     }
-                    lyrics[`T${i}`] = q(`${l}[offset='${i}'] ${t}`).textContent;
+                    try {lyrics[`T${i}`] = q(`${l}[offset='${i}'] ${t}`).textContent}catch{}
                 } catch {
                     if (q(`${l}.rnp-interlude[offset='${i}']`)) {
                         lyrics[`M${i}`] = " · · · ";
                         lyrics[`T${i}`] = "";
+                    }
+                    if (i == 0 && !q(`${l}[offset='0']`) && q(`${l}[offset='-1']`)) {
+                        try {
+                            lyrics[`M${i}`] = q(`${l}[offset='-1'] ${o}`).textContent;
+                        } catch {
+                            lyrics[`M${i}`] = q(`${l}[offset='-1'] ${k}`).textContent;
+                        }
+                        try {lyrics[`T${i}`] = q(`${l}[offset='-1'] ${t}`).textContent}catch{}
                     }
                 }
             }
@@ -138,6 +146,7 @@ async function loadPiP(isToPiP=true) {
     if (/rgba/.test(textC)) {textCT00 = textC.replace(/,([^,)]*)\)/, "")}
     else {textCT00 = textC.replace(/rgb\(/, "rgba(").replace(/\)/, "")}
     textC = `${textCT00})`;
+    let textCT80 = `${textCT00}, .8)`;
     let textCT56 = `${textCT00}, .56)`;
     let textCT31 = `${textCT00}, .31)`;
     let textCT13 = `${textCT00}, .13)`;
@@ -169,7 +178,7 @@ async function loadPiP(isToPiP=true) {
     cC.moveTo(xy, xy); cC.lineTo(c.width, xy); /*底边框*/
     cC.stroke();
     if (nlCv) {
-        cC.fillStyle = textCT56; cC.font = "25px 'Microsoft YaHei'"; cC.fillText(ldTxt, 5, 30); /*封面(加载)*/
+        cC.fillStyle = textCT80; cC.font = "25px 'Microsoft YaHei'"; cC.fillText(ldTxt, 5, 30); /*封面(加载)*/
         drawRC();
         cover.onload = ()=>{/*封面(完毕)*/
             cC.clearRect(0, 0, cvSize, cvSize);
@@ -258,7 +267,7 @@ async function load() {
         new MutationObserver(() => {
             setTimeout(()=>{
                 loadPiP(false);
-            }, 10)
+            }, 50)
         }).observe(A[i], {
             characterData: true,
             childList: true,
@@ -341,7 +350,7 @@ border: 0 solid;
 <div>
 <p>PiPWindow</p>
 <br />
-<p>v0.0.2 by </p>
+<p>v0.0.3 by </p>
 <input class="link" type="button" onclick="betterncm.ncm.openUrl('https://github.com/Lukoning')" value=" Lukoning " />
 </div>
 <p>开发ing</p>
