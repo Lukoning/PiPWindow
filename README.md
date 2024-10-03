@@ -2,16 +2,17 @@
 
 一个纯JavaScript实现的歌曲信息小窗
 
-灵感来源：网易云Web端的信息小窗。使用了与其相似的方法实现
+灵感来源：网易云Web端的歌词小窗。使用了与其相似的方法实现
 
 ![preview.png](https://github.com/Lukoning/PiPWindow/blob/dist/preview.png)
 
 ### <a href="https://github.com/Lukoning/PiPWindow/releases">更新日志在RELEASES, HERE PLEASE -></a>
 
+<p>❤️点击歌曲红心旁按钮或⚙️设置页按钮打开小窗</p>
 <p>↔ 可拖动，可调整大小</p>
 <p>🐀鼠标上移显示关闭和返回按钮</p>
-<p>x 点击关闭按钮会关闭悬浮窗，并暂停播放</p>
-<p>↗点击返回按钮也会关闭悬浮窗，但不会暂停播放</p>
+<p>↗点击返回按钮会关闭小窗，并回到主窗口</p>
+<p>x 点击关闭按钮也会关闭小窗，但不会回到主窗口</p>
 <p>M 配合Material You主题食用，效果更佳</p>
 <br />
 <p>请注意：</p>
