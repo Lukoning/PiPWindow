@@ -2,8 +2,7 @@
 
 一个纯JavaScript实现的歌曲信息小窗
 
-灵感来源：网易云Web端的信息小窗
-使用了与其相似的方法实现
+灵感来源：网易云Web端的信息小窗。使用了与其相似的方法实现
 
 ![preview.png](https://github.com/Lukoning/PiPWindow/blob/dist/preview.png)
 
