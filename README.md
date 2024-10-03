@@ -6,6 +6,8 @@
 
 ![preview.png](https://github.com/Lukoning/PiPWindow/blob/dist/preview.png)
 
+### <a href="https://github.com/Lukoning/PiPWindow/releases">更新日志在RELEASES, HERE PLEASE -></a>
+
 <p>↔ 可拖动，可调整大小</p>
 <p>🐀鼠标上移显示关闭和返回按钮</p>
 <p>x 点击关闭按钮会关闭悬浮窗，并暂停播放</p>
@@ -48,5 +50,4 @@
 <p>2.没法修改歌词左中右对齐</p>
 <p>3.可以调整窗口大小，但没法调整窗口比例</p>
 <p>4.文本超出窗口后不会自动滚动</p>
-<p>5.并没有一个方便的地方打开悬浮窗（每次都要进设置）</p>
-<p>6.没有逐字歌词</p>
+<p>5.没有逐字歌词</p>
