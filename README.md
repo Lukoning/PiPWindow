@@ -7,17 +7,16 @@
 ![preview.png](https://github.com/Lukoning/PiPWindow/blob/dist/preview.png)
 
 ### <a href="https://github.com/Lukoning/PiPWindow/releases">更新日志在RELEASES, HERE PLEASE -></a>
+# 操作说明
+<p>点击歌曲红心❤️旁按钮或⚙️设置页链接打开/关闭◲小窗</p>
+<p>可拖动↔↕可调整大小</p>
+<p>🐀鼠标移上◲小窗显示控制按钮</p>
+<p>也可以敲击 空格来控制▶️播放⏸️暂停</p>
+<p>↗返回和x关闭的效果可在下方自定义</p><br />
 
-<p>❤️点击歌曲红心旁按钮或⚙️设置页按钮打开小窗</p>
-<p>↔ 可拖动，可调整大小</p>
-<p>🐀鼠标上移显示关闭和返回按钮</p>
-<p>↗点击返回按钮会关闭小窗，并回到主窗口</p>
-<p>x 点击关闭按钮也会关闭小窗，但不会回到主窗口</p>
-<p>M 配合Material You主题食用，效果更佳</p>
-<br />
-<p>请注意：</p>
-<p>目前本插件多行歌词功能依赖</p>
-<p>RefinedNowPlaying 和 LyricBar</p>
+请注意：
+### 目前本插件多行歌词功能依赖
+### RefinedNowPlaying 和 LyricBar
 <p>如要显示多行歌词</p>
 <p>请先打开 RefinedNowPlaying 的播放界面</p>
 <p>或安装 LyricBar （二选一）</p>
@@ -30,8 +29,9 @@
 <p>2.在 LyricBarBlur 内找到如下设置：</p>
 <p> - 背景模糊半径 背景不透明度 文本不透明度 边框宽度 阴影不透明度</p>
 <p>3.将以上设置全部设为0，LyricBar 看起来应该完全消失了</p>
-<br />
-<p>如需使用 类苹果歌词(与 RefinedNowPlaying "冲突")，可以：</p>
+
+### 如需使用 类苹果歌词
+<p>(与 RefinedNowPlaying "冲突")，可以：</p>
 <p>1.下载 类苹果歌词</p>
 <p>2.点击上方 打开插件文件夹 按钮</p>
 <p>3.双击 plugins 文件夹，然后找到 Apple-Musiclike 开头的文件</p>
@@ -45,10 +45,3 @@
 <br />
 <p>？ 类苹果歌词和 RefinedNowPlaying 不是互相冲突的吗，为什么可以这样做</p>
 <p>->实践证明，因为两者实现方式有别，并不会造成实际冲突。安装了类苹果歌词后，可以在打开播放界面的同时，按住Shift键，来打开 RefinedNowPlaying 的播放界面；安装 ←→0123456789JL+-,.↑↓FO 插件后，也可以通过按 F 来打开。</p>
-<br />
-<p>已知问题：</p>
-<p>1.没法在这个窗口上暂停、切换上下曲</p>
-<p>2.没法修改歌词左中右对齐</p>
-<p>3.可以调整窗口大小，但没法调整窗口比例</p>
-<p>4.文本超出窗口后不会自动滚动</p>
-<p>5.没有逐字歌词</p>
