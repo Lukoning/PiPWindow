@@ -1,14 +1,18 @@
 # PiPWindow
 
-一个通过JavaScript实现的歌曲信息小窗
+一个通过JavaScript实现的歌曲信息小窗。
 
-灵感来源：网易云Web端的歌词小窗。使用了与其相似的方法实现
+灵感来源：网易云Web端的歌词小窗。使用了与其相似的方法实现。
 
-![preview.webp](https://github.com/Lukoning/PiPWindow/raw/refs/heads/dist/preview.webp)
+![预览图.webp](preview.webp)
 
-![image](https://github.com/user-attachments/assets/3e24fe01-1e79-4f84-8de3-19adc115e533)
+![预览图2.webp](preview-2.webp)
 
-⚠️ 由于本人已不再使用betterncm，本项目无限期停更
+![预览图3.webp](preview-3.webp)
+
+![预览图4.webp](preview-4.webp)
+
+### 欢迎各路大神贡献本项目！
 
 ### <a href="https://github.com/Lukoning/PiPWindow/releases">更新日志在RELEASES, HERE PLEASE -></a>
 # 说明
@@ -17,3 +21,4 @@
 <p>🐀鼠标移上◲小窗显示控制按钮</p>
 <p>也可以敲击 空格来控制▶️播放⏸️暂停</p>
 <p>↗返回和x关闭的效果可自定义</p>
+<p>还有大量自定义选项…</p>

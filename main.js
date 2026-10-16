@@ -1,5 +1,5 @@
 /*This plugin is licensed under the GNU/GPL-3.0
-**Copyright (C) 2024-2025 Lukoning
+**Copyright (C) 2024-2026 Lukoning
 */
 let rvN, reRatioTimer, winAspect, v, amllbgv/*Apple Music-like Lyrics Background Video*/, b/*(toggle)button*/, cP/*configPage*/, c/*canvas*/, bgc/*Background Canvas*/, cpc/*ColorPick() Canvas*/, cC/*...Context*/, bgcC, cpcC
 , cover, OcvUrl, cvUrl, cvUrlCache, OcvUrlCache, songDataCache, tMsT, lrcCache, pLrc, pLrcKeys, showRefreshing, thePiPWindow, curLdTxt, cvDrawn=false, lrcPrevC, lrcCurC, lrcOldC, lrcLastKey, lrcLastDy=0, lrcAnimStart=0, lrcAnimDy=0, nrNextTick=false
@@ -69,7 +69,7 @@ function reRatio(rv) {
         if (!document.pictureInPictureElement) {return} /*窗口已经关闭*/
         let changed = false;
         /*自适应分辨率*/
-        if (autoRatio && Math.abs(rvN - autoRatioValue) / autoRatioValue >= 0.1) {autoRatioValue = rvN; changed = true} /*变化很小就不动，避免来回抖动*/
+        if (autoRatio && Math.abs(rvN - autoRatioValue) / autoRatioValue >= 0.01) {autoRatioValue = rvN; changed = true} /*变化很小就不动，避免来回抖动*/
         /*跟随窗口实际宽高比：窗口被放大/吸附后形状可能和画布不一致，上下或左右会出现黑边(黑边在视频之外，只能让画布跟着窗口的形状变)*/
         let pw = thePiPWindow, a = (pw && pw.width > 0 && pw.height > 0) ? pw.width / pw.height : 0;
         if (a > 0) {
@@ -233,8 +233,9 @@ function colorPick(from=null) { //取色
 
 async function loadPiP(isToPiP=true, from="unknow") {
     let PiPE = document.pictureInPictureElement;
-    if ((v ? v.paused : false) || (!isToPiP && !PiPE && !debugMode)) {return}
+    if (!isToPiP && !PiPE && !debugMode) return
     if (PiPE && PiPE.id != "PiPW-VideoE") {tipMsg("PiP窗口被占用", "err"); if(!debugMode){return}}
+    if (v?.paused) nrNextTick = false
     let startTime = Date.now();
     try {
         let nrInfo=false/*need re-*/, nrHead=false, chigai=false /*曲目不同以往(?)*/
@@ -345,22 +346,20 @@ async function loadPiP(isToPiP=true, from="unknow") {
     
         /*歌词*/
         let lyrics = ({
-            M: {
-                0: "暂无歌词",
-                1: "",
-                2: "",
-                3: "",
-                4: "",
-            },
-            T: {
-                0: "",
-                1: "",
-                2: "",
-                3: "",
-                4: "",
-            },
-            currentT: 0,
-            currentD: 0,
+            M: [
+                "暂无歌词",
+                "",
+                "",
+                "",
+            ],
+            T: [
+                "暂无歌词",
+                "",
+                "",
+                "",
+            ],
+            currentStartT: 0, // 当前歌词行开始时刻
+            currentD: 0, // 当前歌词行持续时间
         }), offset = readCfg.lyricsOffset*1000, progress = playProgress + offset;
         if (readCfg.lyricsFrom != "RNP") {
             document.removeEventListener("lyrics-updated", rnpLrcUpdate);
@@ -506,10 +505,10 @@ async function loadPiP(isToPiP=true, from="unknow") {
                 if (p < pLrc[i].time+d || i==l-1) {
                     if (pLrc[i].dynamicLyric&&readCfg.dynamicLyrics) { //第1行主歌词
                         lyrics.M[0] = pLrc[i].dynamicLyric
-                        lyrics.currentT = pLrc[i].dynamicLyricTime
+                        lyrics.currentStartT = pLrc[i].dynamicLyricTime
                     } else {
                         lyrics.M[0] = pLrc[i].originalLyric
-                        lyrics.currentT = pLrc[i].time
+                        lyrics.currentStartT = pLrc[i].time
                     }
                     lyrics.currentD = d==0?data.duration-pLrc[i].time:d
                     for (let j = 1; j < 5; j++) {lyrics.M[j] = i+j<l?pLrc[i+j].originalLyric:""} //2~5行主歌词
@@ -576,8 +575,12 @@ async function loadPiP(isToPiP=true, from="unknow") {
             nrInfo = true;
         }
 
-        let o1 = r/480, o2 = r/240, o3 = r/160, o5 = r/96, o6 = r/80, o9 = r/53.3333, o10 = r/48, o12 = r/40, o15 = r/32, o20 = r/24, o21p5 = r/22.3256, o25 = r/19.2, o30 = r/16, o30p5 = r/15.7377, o35 = r/13.7143, o40 = r/12, o45 = r/10.6667, o55 = r/8.7272, o60 = r/8, o105 = r/4.57143, o150 = r/3.2, o480 = r
-        , edgeM = o20 /*内容与窗口边缘的统一留白*/
+        let u=r/480 //由于设计时画布大小为960x480，故这里除以480
+        let o1=u, o2=u*2, o3=u*3, o5=u*5, o10=u*10, o12=u*12, o15=u*15
+        , o20=u*20, o21p5=u*21.5, o25=u*25, o30=u*30, o30p5=u*30.5, o35=u*35
+        ,o45=u*45, o55=u*55, o60=u*60, o105=u*105, o150=u*150
+        , o480=u*480
+        let edgeM = o20 /*内容与窗口边缘的统一留白*/
         , cvR = (thePiPWindow&&thePiPWindow.height) ? o480*6/thePiPWindow.height : o12 /*封面圆角为6px，比窗口圆角(8px)略小，以获得视觉平衡*/
         , txtMgL = edgeM + cvSizeX + o10
         cC.textAlign = "left";
@@ -587,37 +590,43 @@ async function loadPiP(isToPiP=true, from="unknow") {
         let lrcFS = o55, lrcMgT = o45, lrcMgL = edgeM, lrcMgR = edgeM, mLrcMgL = lrcMgL
         , lrcTop = cvSizeY+edgeM+lrcMgT
         , lrcSSS = readCfg.lyricsTaperOff;
-        let lrcLine = [lrcTop+lrcFS, lrcTop+lrcFS*2+o10, lrcTop+lrcFS*3+o12, lrcTop+lrcFS*4+o10, lrcTop+lrcFS*5+o2]
+        let lrcLine = [lrcTop+lrcFS, lrcTop+lrcFS*2+o3*3, lrcTop+lrcFS*3+o3*4, lrcTop+lrcFS*4+o3*5]
         function lyricStyle(line=0, isT=false, isU/*Unplayed*/=false) {
             if (!isT) {
                 switch (line) {
-                    case 0: if (!isU) {cC.fillStyle = color.text, cC.font = `${oLFW} ${lrcFS}px ${fM}`, lrcMgL = edgeM}
-                            else {cC.fillStyle = color.textT42, cC.font = `${oLFW} ${lrcFS}px ${fM}`, lrcMgL = edgeM} return;
-                    case 1: cC.fillStyle = color.textT56, cC.font = `${oLFW} ${lrcFS-o10}px ${fM}`, lrcSSS?lrcMgL = edgeM:""; return;
-                    case 2: cC.fillStyle = color.textT56, cC.font = `${oLFW} ${lrcSSS?lrcFS-o15:lrcFS-o10}px ${fM}`, lrcSSS?lrcMgL = edgeM:""; return;
-                    case 3: cC.fillStyle = color.textT56, cC.font = `${oLFW} ${lrcSSS?lrcFS-o20:lrcFS-o10}px ${fM}`, lrcSSS?lrcMgL = edgeM:""; return;
-                    case 4: default: cC.fillStyle = color.textT56, cC.font = `${oLFW} ${lrcSSS?lrcFS-o25:lrcFS-o10}px ${fM}`, lrcSSS?lrcMgL = edgeM:""; return;
+                    case 0: if (!isU) cC.fillStyle = color.text;
+                            else cC.fillStyle = color.textT42;
+                            cC.font = `${oLFW} ${lrcFS}px ${fM}`; return;
+                    case 1: cC.fillStyle = color.textT56, cC.font = `${oLFW} ${lrcFS-o10}px ${fM}`; return;
+                    case 2: cC.fillStyle = color.textT56, cC.font = `${oLFW} ${lrcFS-(lrcSSS?o15:o10)}px ${fM}`; return;
+                    case 3: default: cC.fillStyle = color.textT56, cC.font = `${oLFW} ${lrcFS-(lrcSSS?o20:o10)}px ${fM}`; return;
                 }
             } else {
                 switch (line) {
-                    case 0: cC.fillStyle = color.textT56, cC.font = `${tLFW} ${lrcFS-o5}px ${fT}`, lrcMgL = edgeM; return;
-                    case 1: cC.fillStyle = color.textT31, cC.font = `${tLFW} ${lrcFS-o15}px ${fT}`, lrcSSS?lrcMgL = edgeM:""; return;
-                    case 2: cC.fillStyle = color.textT31, cC.font = `${tLFW} ${lrcSSS?lrcFS-o20:lrcFS-o15}px ${fT}`, lrcSSS?lrcMgL = edgeM:""; return;
-                    case 3: default: cC.fillStyle = color.textT31, cC.font = `${tLFW} ${lrcSSS?lrcFS-o25:lrcFS-o15}px ${fT}`, lrcSSS?lrcMgL = edgeM:""; return;
+                    case 0: cC.fillStyle = color.textT56, cC.font = `${tLFW} ${lrcFS-o5}px ${fT}`; return;
+                    case 1: cC.fillStyle = color.textT31, cC.font = `${tLFW} ${lrcFS-o15}px ${fT}`; return;
+                    case 2: cC.fillStyle = color.textT31, cC.font = `${tLFW} ${lrcFS-(lrcSSS?o20:o15)}px ${fT}`; return;
+                    case 3: default: cC.fillStyle = color.textT31, cC.font = `${tLFW} ${lrcFS-(lrcSSS?o25:o15)}px ${fT}`; return;
                 }
             }
         }
-        function updateMLrcMgL(w, now) { //w是歌词行宽度，now是当前歌词行已播放百分比
+        function updateMLrcMgL(w, now) { //w是歌词行宽度，now是当前歌词行已播放百分比(动态歌词传入)
+            if (!readCfg.autoScroll) return
             let lrcAreaW = c.width-lrcMgL-lrcMgR
-            if (!readCfg.autoScroll||w<=lrcAreaW) return
-            if (!now) {
-                now = (progress+offset-lyrics.currentT)/lyrics.currentD
-                now = lyrics.currentT>progress ? 0 : now>1?1:now
+            if (w<=lrcAreaW) mLrcMgL = lrcMgL
+            else {
+                nrNextTick = true
+                let start = lyrics.currentStartT, d = lyrics.currentD, p = progress
+                if (now === undefined) {
+                    if (start>p || !(d>0)) now = 0
+                    else {
+                        now = (p-start)/d
+                        now = now>1?1:now
+                    }
+                }
+                let lrcMgLOffset = w*now-lrcAreaW+o150 // o150 是当前播放位置与右边缘的距离
+                mLrcMgL = lrcMgL-(lrcMgLOffset>0?lrcMgLOffset:0)
             }
-            let l = w*now
-            if (l+o150>lrcAreaW) mLrcMgL = lrcAreaW+lrcMgL-l-o150
-            // 使用时间提前量(300ms)，以规避渲染延迟
-            if (progress >= lyrics.currentT + lyrics.currentD*(lrcAreaW-o150)/w - 300) nrNextTick = true;
         }
         
         /*歌词先画到自带透明通道的离屏图层上(主画布是alpha:false，不能直接当透明图层来读取)，画完再贴回主画布*/
@@ -668,49 +677,47 @@ async function loadPiP(isToPiP=true, from="unknow") {
                 lyricStyle(realLine, isT); cC.fillText(isT?lyrics.T[realLine]:lyrics.M[realLine], lrcMgL, lrcLine[showLine]-isT?o10:0);
             }*/
         
-            if (lyrics.T[0]!="") {
-                lyricStyle(0, true);
-                if (readCfg.lyricsFrom!="OriginalLyricBar") {
-                    updateMLrcMgL(cC.measureText(lyrics.T[0]).width);
-                }
-                cC.fillText(lyrics.T[0], mLrcMgL, lrcLine[1]-o10); /*歌词翻译*/
-                lyricStyle(1); cC.fillText(lyrics.M[1], lrcMgL, lrcLine[2]); /*下1句主歌词*/
-                if (lyrics.T[1]!="") {
-                    lyricStyle(1, true); cC.fillText(lyrics.T[1], lrcMgL, lrcLine[3]-o10); /*下1句歌词翻译*/
-                    lyricStyle(2); cC.fillText(lyrics.M[2], lrcMgL, lrcLine[4]); /*下2句主歌词*/
+        if (lyrics.T[0]!="") {
+            lyricStyle(0, true);
+            if (readCfg.lyricsFrom!="OriginalLyricBar") {
+                updateMLrcMgL(cC.measureText(lyrics.T[0]).width);
+            }
+            cC.fillText(lyrics.T[0], mLrcMgL, lrcLine[1]-o5); /*歌词翻译*/
+            lyricStyle(1); cC.fillText(lyrics.M[1], lrcMgL, lrcLine[2]); /*下1句主歌词*/
+            if (lyrics.T[1]!="") {
+                lyricStyle(1, true); cC.fillText(lyrics.T[1], lrcMgL, lrcLine[3]-o10); /*下1句歌词翻译*/
+                lyricStyle(2); cC.fillText(lyrics.M[2], lrcMgL, lrcLine[4]); /*下2句主歌词*/
+            } else {
+                lyricStyle(2); cC.fillText(lyrics.M[2], lrcMgL, lrcLine[3]); /*下2句主歌词*/
+                if (lyrics.T[2]!="") {
+                    lyricStyle(2, true); cC.fillText(lyrics.T[2], lrcMgL, lrcLine[4]-o10); /*下2句歌词翻译*/
                 } else {
-                    lyricStyle(2); cC.fillText(lyrics.M[2], lrcMgL, lrcLine[3]); /*下2句主歌词*/
-                    if (lyrics.T[2]!="") {
-                        lyricStyle(2, true); cC.fillText(lyrics.T[2], lrcMgL, lrcLine[4]-o10); /*下2句歌词翻译*/
-                    } else {
-                        lyricStyle(3); cC.fillText(lyrics.M[3], lrcMgL, lrcLine[4]); /*下3句主歌词*/
-                    }
+                    lyricStyle(3); cC.fillText(lyrics.M[3], lrcMgL, lrcLine[4]); /*下3句主歌词*/
+                }
+            }
+        } else {
+            lyricStyle(1); cC.fillText(lyrics.M[1], lrcMgL, lrcLine[1]); /*下1句主歌词*/
+            if (lyrics.T[1]!="") {
+                lyricStyle(1, true); cC.fillText(lyrics.T[1], lrcMgL, lrcLine[2]-o10); /*下1句歌词翻译*/
+                lyricStyle(2); cC.fillText(lyrics.M[2], lrcMgL, lrcLine[3]); /*下2句主歌词*/
+                if (lyrics.T[2]!="") {
+                    lyricStyle(2, true); cC.fillText(lyrics.T[2], lrcMgL, lrcLine[4]-o10); /*下2句歌词翻译*/
+                } else {
+                    lyricStyle(3); cC.fillText(lyrics.M[3], lrcMgL, lrcLine[4]); /*下3句主歌词*/
                 }
             } else {
-                lyricStyle(1); cC.fillText(lyrics.M[1], lrcMgL, lrcLine[1]); /*下1句主歌词*/
-                if (lyrics.T[1]!="") {
-                    lyricStyle(1, true); cC.fillText(lyrics.T[1], lrcMgL, lrcLine[2]-o10); /*下1句歌词翻译*/
-                    lyricStyle(2); cC.fillText(lyrics.M[2], lrcMgL, lrcLine[3]); /*下2句主歌词*/
-                    if (lyrics.T[2]!="") {
-                        lyricStyle(2, true); cC.fillText(lyrics.T[2], lrcMgL, lrcLine[4]-o10); /*下2句歌词翻译*/
-                    } else {
-                        lyricStyle(3); cC.fillText(lyrics.M[3], lrcMgL, lrcLine[4]); /*下3句主歌词*/
-                    }
+                lyricStyle(2); cC.fillText(lyrics.M[2], lrcMgL, lrcLine[2]); /*下2句主歌词*/
+                if (lyrics.T[2]!="") {
+                    lyricStyle(2, true); cC.fillText(lyrics.T[2], lrcMgL, lrcLine[3]-o10); /*下2句歌词翻译*/
+                    lyricStyle(3); cC.fillText(lyrics.M[3], lrcMgL, lrcLine[4]); /*下3句主歌词*/
                 } else {
-                    lyricStyle(2); cC.fillText(lyrics.M[2], lrcMgL, lrcLine[2]); /*下2句主歌词*/
-                    if (lyrics.T[2]!="") {
-                        lyricStyle(2, true); cC.fillText(lyrics.T[2], lrcMgL, lrcLine[3]-o10); /*下2句歌词翻译*/
-                        lyricStyle(3); cC.fillText(lyrics.M[3], lrcMgL, lrcLine[4]); /*下3句主歌词*/
-                    } else {
-                        lyricStyle(3); cC.fillText(lyrics.M[3], lrcMgL, lrcLine[3]); /*下3句主歌词*/
-                        if (lyrics.T[3]!="") {
-                            lyricStyle(3, true); cC.fillText(lyrics.T[3], lrcMgL, lrcLine[4]-o10); /*下3句歌词翻译*/
-                        } else {
-                            lyricStyle(4); cC.fillText(lyrics.M[4], lrcMgL, lrcLine[4]); /*下4句主歌词*/
-                        }
+                    lyricStyle(3); cC.fillText(lyrics.M[3], lrcMgL, lrcLine[3]); /*下3句主歌词*/
+                    if (lyrics.T[3]!="") {
+                        lyricStyle(3, true); cC.fillText(lyrics.T[3], lrcMgL, lrcLine[4]-o10); /*下3句歌词翻译*/
                     }
                 }
             }
+        }
 
         } finally {cC = realCC} /*无论歌词绘制是否出错，都必须切回主画布*/
 
@@ -718,10 +725,10 @@ async function loadPiP(isToPiP=true, from="unknow") {
           先于遮罩执行，遮罩在合成之后再盖，位置固定不动*/
         if (lrcLayerOK) {
             let layer = lrcCurC, animating = false, tracking = readCfg.lyricsTransition && !lrcNowLoading;
-            // 提前量：换行前 300ms 开始持续请求重绘，确保换行帧被立即重绘
-            if (progress > lyrics.currentT + lyrics.currentD - 300) nrNextTick = true
+            // 提前量：换行前 500ms 开始持续请求重绘，确保换行帧被立即重绘
+            if (progress > lyrics.currentStartT + lyrics.currentD - 500) nrNextTick = true
             if (tracking) {
-                let lrcKey = songIdCache+"|"+lyrics.currentT
+                let lrcKey = songIdCache+"|"+lyrics.currentStartT
                 , dy = Math.round((lyrics.T[0]!=""?lrcLine[2]:lrcLine[1]) - lrcLine[0])
                 , sizeOK = lrcPrevC && lrcPrevC.width==lrcW && lrcPrevC.height==lrcH;
                 if (lrcLastKey!==undefined && lrcLastKey!=lrcKey && sizeOK && lrcLastDy>0) {
@@ -1389,7 +1396,7 @@ function getSettingsPage() {
     <br />
     <p>by </p>
     <input class="link" type="button" onclick="betterncm.ncm.openUrl('https://github.com/Lukoning')" value=" Lukoning " />
-    <p> 2025</p>
+    <p> 2026</p>
     <div style="text-align: right; position: absolute; bottom: 10px; right: 20px;">
         <input class="link" type="button" onclick="betterncm.ncm.openUrl('https://github.com/Lukoning/PiPWindow')" value=" 源代码仓库(GitHub) " />
         <br />
@@ -1403,6 +1410,7 @@ function getSettingsPage() {
     <p>🐀鼠标移上◲小窗显示控制按钮</p>
     <p>也可以单击小窗后敲击 空格来控制▶️播放⏸️暂停</p>
     <p>↗返回和x关闭的效果可在下方自定义</p>
+    <p>还有大量自定义选项…</p>
 </div>
 <div class="part noAutoBr">
     <p class="partTitle">自定义设置</p>
