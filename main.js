@@ -7,16 +7,17 @@ let rvN, reRatioTimer, winAspect, v, amllbgv/*Apple Music-like Lyrics Background
 , isVLsnAdded=false, isLrcRnpLsnAdded=false
 , t = "0:00 / 0:00", tC = 0, tT = 0, tP = 0, tR = 0 //显示用，Current，Total，PassedRate，Remaining
 , readCfg = JSON.parse(localStorage.getItem("PiPWindowSettings"))
-, color = ({accent: "", text: "", textT13: "", textT31: "", textT42: "", textT56: "", bg: "", bgT00: "", bgT50: ""}), colorS = ({accent: "", text: "", bg: "", bgT: ""}), colorCache = ({text: "", bg: ""})
+, color = ({accent: "", text: "", textT20: "", textT40: "", textT50: "", textT60: "", bg: "", bgT00: "", bgT50: ""}), colorS = ({accent: "", text: "", bg: "", bgT: ""}), colorCache = ({text: "", bg: ""})
 , song = ({name:"", nameAnother:"", artist:""})
 const pdd = "M21 3C21.5523 3 22 3.44772 22 4V11H20V5H4V19H10V21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3H21ZM21 13C21.5523 13 22 13.4477 22 14V20C22 20.5523 21.5523 21 21 21H13C12.4477 21 12 20.5523 12 20V14C12 13.4477 12.4477 13 13 13H21Z"
 , pO = `<path d="${pdd}M20 15H14V19H20V15ZM6.70711 6.29289L8.95689 8.54289L11 6.5V12H5.5L7.54289 9.95689L5.29289 7.70711L6.70711 6.29289Z"></path>`
 , pC = `<path d="${pdd}"></path>`
 , cfgDefault = ({
     whenClose: "none", whenBack: "back", whenCloseOrBack_paused: "close", autoHideMainWindow: false, showTaskbarButton: false
-    , useCloudDataForLocalFile: false, showDiscWhenNoCover: false, allowNonsquareCover: false, /*showIconBarBeforeInfo: true,*/ trackInfoShow: "album", timeInfo: "CurrentTotal"
+    , useCloudDataForLocalFile: false, showDiscWhenNoCover: false, allowNonsquareCover: false, /*showIconBarBeforeInfo: true,*/ trackInfoShow: "auto", timeInfo: "CurrentTotal"
     , lyricLine2Show: "auto", dynamicLyrics: true, autoScroll: true, lyricsTaperOff: true, lyricsMask: false, lyricsTransition: true, lyricsHanzi2Kanji: true, lyricsOffset: 0, lyricsFrom: "LibLyric", lyricsCustomSources: "https://example.com/lyric?track=${track}&id=${trackId}&art=${artist}&arts=${artists}&album=${album}&albumId=${albumId}", showLyricsErrorTip: true
-    , colorFrom: "albumCover", colorCustom_accent: "#FFFFFF", colorCustom_text: "#FFFFFF", colorCustom_bg: "#424242", backgroundFrom: "albumCoverBlur", generalFontWeight: 400, originalLyricsFontWeight: 700, translatedLyricsFontWeight: 400, customFonts: "\"Segoe UI\", \"Microsoft Yahei UI\", system-ui", useJapaneseFonts: true, customJapaneseFonts: "\"Yu Gothic UI\", \"Meiryo UI\", \"Microsoft Yahei UI\", system-ui"
+    , colorFrom: "albumCover", colorCustom_accent: "#FFFFFF", colorCustom_text: "#FFFFFF", colorCustom_bg: "#424242", backgroundFrom: "albumCoverBlur", generalFontWeight: 400, originalLyricsFontWeight: 700, translatedLyricsFontWeight: 400
+    , customFonts: "\"Segoe UI\", \"Microsoft Yahei UI\", system-ui", useJapaneseFonts: true, customJapaneseFonts: "\"Yu Gothic UI\", \"Meiryo UI\", \"Microsoft Yahei UI\", system-ui", coverCornerRadius: 6 /*封面圆角默认为6px，比Win11窗口圆角(8px)略小，以获得视觉平衡*/
     , smoothProgessBar: false, resolutionRatio: "auto", aspectRatio: "2:1", albumCoverSize: 160, useFullCover: false
     , customLoadingTxt: "正在载入猫猫…|猫猫正在赶来的路上…|马上就好了喵…"})
 , DcvUrl/*Default*/ = "orpheus://orpheus/style/res/common/discovery/calendar_bg.png"
@@ -69,7 +70,7 @@ function reRatio(rv) {
         if (!document.pictureInPictureElement) {return} /*窗口已经关闭*/
         let changed = false;
         /*自适应分辨率*/
-        if (autoRatio && Math.abs(rvN - autoRatioValue) / autoRatioValue >= 0.01) {autoRatioValue = rvN; changed = true} /*变化很小就不动，避免来回抖动*/
+        if (autoRatio && Math.abs(rvN - autoRatioValue) >= 2) {autoRatioValue = rvN; changed = true} /*变化很小(2px以下)就不动，避免来回抖动*/
         /*跟随窗口实际宽高比：窗口被放大/吸附后形状可能和画布不一致，上下或左右会出现黑边(黑边在视频之外，只能让画布跟着窗口的形状变)*/
         let pw = thePiPWindow, a = (pw && pw.width > 0 && pw.height > 0) ? pw.width / pw.height : 0;
         if (a > 0) {
@@ -176,47 +177,77 @@ function colorPick(from=null) { //取色
     if (readCfg.colorFrom=="custom") { //这里的数据是HEX格式
         color.accent = readCfg.colorCustom_accent;
         textTO = readCfg.colorCustom_text;
-        color.text = textTO, color.textT56 = `${textTO}8F`, color.textT42 = `${textTO}6B`, color.textT31 = `${textTO}4F`, color.textT13 = `${textTO}21`;
+        color.text = textTO, color.textT60 = `${textTO}99`, color.textT50 = `${textTO}80`, color.textT40 = `${textTO}66`, color.textT20 = `${textTO}33`;
         bgTO = readCfg.colorCustom_bg;
         color.bg = bgTO, color.bgT00 = `${bgTO}00`, color.bgT50 = `${bgTO}7F`;
     } else {
         if (from==null) {
             color.accent = colorS.accent;
         } else if (from instanceof HTMLElement) {
-            function brightness(rgb, factor) {
-                let rN = Math.min(255, Math.max(0, rgb[0] * factor))
-                , gN = Math.min(255, Math.max(0, rgb[1] * factor))
-                , bN = Math.min(255, Math.max(0, rgb[2] * factor));
-                return [Math.round(rN), Math.round(gN), Math.round(bN), 255];
-            }
-            function saturation(rgb, factor) {
-                let l = (.299*rgb[0]+.587*rgb[1]+.114*rgb[2])
-                , rN = Math.min(255, Math.max(0, l + (rgb[0] - l) * factor))
-                , gN = Math.min(255, Math.max(0, l + (rgb[1] - l) * factor))
-                , bN = Math.min(255, Math.max(0, l + (rgb[2] - l) * factor));
-                return [Math.round(rN), Math.round(gN), Math.round(bN), 255];
-            }
+            // --- 内联 HSL 与对比度辅助函数 ---
+            function rgbToHsl(r,g,b) {
+                r/=255; g/=255; b/=255; const mx=Math.max(r,g,b), mn=Math.min(r,g,b); let h,s,l=(mx+mn)/2;
+                if (mx===mn) { h=s=0 } else { const d=mx-mn; s=l>.5?d/(2-mx-mn):d/(mx+mn);
+                switch (mx) { case r: h=(g-b)/d+(g<b?6:0); break; case g: h=(b-r)/d+2; break; case b: h=(r-g)/d+4; break; } h/=6 }
+                return [h*360, s*100, l*100];
+            };
+            function hslToRgb(h,s,l) {
+                h/=360; s/=100; l/=100; let r,g,b;
+                if (s===0) { r=g=b=l } else {
+                    function hue2rgb(p,q,t){
+                        if(t<0)t+=1; if(t>1)t-=1;
+                        if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p;
+                    };
+                    const q = l<.5?l*(1+s):l+s-l*s, p=2*l-q;
+                    r=hue2rgb(p,q,h+1/3); g=hue2rgb(p,q,h); b=hue2rgb(p,q,h-1/3);
+                }
+                return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
+            };
+            function getLuminance(r,g,b) {
+                const a=[r,g,b].map(v=>{
+                    v/=255; return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);
+                });
+                return a[0]*.2126 + a[1]*.7152 + a[2]*.0722;
+            };
             if (!cpc||!cpcC) {cpc = cE("canvas"); cpc.width = 3; cpc.height = 3; cpcC = cpc.getContext("2d",{alpha:false})}
             from.height?cpcC.drawImage(from, 0, 0, cpc.width, cpc.height):""
-            let rgb = cpcC.getImageData(1, 1, 2, 2).data
-            , l = (.299*rgb[0]+.587*rgb[1]+.114*rgb[2])
-            , bf = 1, sf = 1.2
-            l<8?bf=50 : l<16?bf=16 : l<32?bf=12 : l<64?bf=8 : l<128?bf=2 : l>144?bf=(-.4) : ""
-            l>144?sf=6 : ""
-            let rgbN = brightness(rgb, l>160?1.1:l>144?1.4:.5)
-            bgTO = `rgba(${rgbN[0]}, ${rgbN[1]}, ${rgbN[2]}`
-            if (readCfg.backgroundFrom == "AMLL"&&loadedPlugins["Apple-Musiclike-lyrics"]) { //AMLL背景下的颜色...优化?
-                rgbN = brightness(saturation(rgb, sf+.3), 4+bf)
-                if ((.299*rgbN[0]+.587*rgbN[1]+.114*rgbN[2])>245) {rgbN = brightness(saturation(rgb, 4), 2+bf)}
-            } else {
-                rgbN = brightness(saturation(rgb, sf), .7+bf)
-                if ((.299*rgbN[0]+.587*rgbN[1]+.114*rgbN[2])>245) {rgbN = brightness(saturation(rgb, 4), .7+bf)}
+            let rgb = cpcC.getImageData(1, 1, 2, 2).data;
+            // 1. 获取并处理 HSL 信息
+            let [h, s, l] = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+            s = (s**(.5))*10; // 非线性提升饱和度，即用根号s乘以10
+            // 2. 处理背景
+            let isDark = l < 56; // 暗色转变阈值：56%
+            let bgS = Math.min(s, 40); // 最高40%饱和度
+            let bgL = isDark ? 20 : 70; // 如果原图暗，背景变暗，否则变亮
+            let bgRgb = hslToRgb(h, bgS, bgL);
+            bgTO = `rgba(${bgRgb[0]}, ${bgRgb[1]}, ${bgRgb[2]}`;
+            // 3. 处理强调色/文字色
+            let textS = Math.min(Math.max(s, 60), 90); // 最低60%保证色彩，最高限制在90%防荧光色
+            let textL = isDark ? 80 : 20; // 基础亮度设定在 80%（暗色）和 20%（亮色）
+            // AMLL 特殊处理（如果启用了 AMLL，强制变亮）
+            if (readCfg.backgroundFrom == "AMLL" && loadedPlugins["Apple-Musiclike-lyrics"]) {
+                textL = 80;
             }
-            if (rgbN[0]>235&&rgbN[1]<235&&rgbN[2]<235) {rgbN = [235, rgbN[1]<50?50:rgbN[1], rgbN[2]<30?30:rgbN[2]]} //太红看不清
-            color.accent = `rgb(${rgbN[0]}, ${rgbN[1]}, ${rgbN[2]})`
-            textTO = `rgba(${rgbN[0]}, ${rgbN[1]}, ${rgbN[2]}`
+            let textRgb = hslToRgb(h, textS, textL);
+            // 4. 对比度判定（WCAG AA 标准，对比度不低于 4.5）
+            let bgLum = getLuminance(bgRgb[0], bgRgb[1], bgRgb[2]);
+            let textLum = getLuminance(textRgb[0], textRgb[1], textRgb[2]);
+            let contrast = (Math.max(bgLum, textLum) + .05) / (Math.min(bgLum, textLum) + .05);
+            // 如果对比度不足，提高/降低文字亮度
+            if (contrast < 4.5) {
+                textL = isDark ? 90 : 10;
+                textRgb = hslToRgb(h, textS, textL);
+                textLum = getLuminance(textRgb[0], textRgb[1], textRgb[2]);
+                contrast = (Math.max(bgLum, textLum) + .05) / (Math.min(bgLum, textLum) + .05);
+                // 终极兜底：直接使用纯白色/纯黑色
+                if (contrast < 4.5) {
+                    textRgb = isDark ? [255, 255, 255] : [0, 0, 0];
+                }
+            }
+            color.accent = `rgb(${textRgb[0]}, ${textRgb[1]}, ${textRgb[2]})`;
+            textTO = `rgba(${textRgb[0]}, ${textRgb[1]}, ${textRgb[2]}`;
         }
-        color.text = `${textTO})`, color.textT56 = `${textTO}, .56)`, color.textT42 = `${textTO}, .42)`, color.textT31 = `${textTO}, .31)`, color.textT13 = `${textTO}, .13)`;
+        color.text = `${textTO})`, color.textT60 = `${textTO}, .6)`, color.textT50 = `${textTO}, .5)`, color.textT40 = `${textTO}, .4)`, color.textT20 = `${textTO}, .2)`;
         color.bg = `${bgTO})`, color.bgT00 = `${bgTO}, 0)`, color.bgT50 = `${bgTO}, .5)`;
     }
     
@@ -353,7 +384,7 @@ async function loadPiP(isToPiP=true, from="unknow") {
                 "",
             ],
             T: [
-                "暂无歌词",
+                "",
                 "",
                 "",
                 "",
@@ -575,13 +606,17 @@ async function loadPiP(isToPiP=true, from="unknow") {
             nrInfo = true;
         }
 
-        let u=r/480 //由于设计时画布大小为960x480，故这里除以480
-        let o1=u, o2=u*2, o3=u*3, o5=u*5, o10=u*10, o12=u*12, o15=u*15
-        , o20=u*20, o21p5=u*21.5, o25=u*25, o30=u*30, o30p5=u*30.5, o35=u*35
-        ,o45=u*45, o55=u*55, o60=u*60, o105=u*105, o150=u*150
-        , o480=u*480
+        const H = 480;
+        // 倍率 n 直接乘 r 再除以 H；n 为整数时 n*r 在安全整数范围内是精确的
+        const o = n => n * r / H;
+        let o3 = o(3), o5 = o(5), o10 = o(10), o12 = o(12), o15 = o(15),
+            o20 = o(20), o21p5 = o(21.5), o25 = o(25), o30 = o(30), o30p5 = o(30.5),
+            o35 = o(35), o45 = o(45), o55 = o(55), o60 = o(60), o105 = o(105),
+            o150 = o(150), o480 = r;
         let edgeM = o20 /*内容与窗口边缘的统一留白*/
-        , cvR = (thePiPWindow&&thePiPWindow.height) ? o480*6/thePiPWindow.height : o12 /*封面圆角为6px，比窗口圆角(8px)略小，以获得视觉平衡*/
+        , cvR = (thePiPWindow&&thePiPWindow.height)
+            ? o480*readCfg.coverCornerRadius/thePiPWindow.height
+            : o12
         , txtMgL = edgeM + cvSizeX + o10
         cC.textAlign = "left";
 
@@ -595,18 +630,18 @@ async function loadPiP(isToPiP=true, from="unknow") {
             if (!isT) {
                 switch (line) {
                     case 0: if (!isU) cC.fillStyle = color.text;
-                            else cC.fillStyle = color.textT42;
+                            else cC.fillStyle = color.textT50;
                             cC.font = `${oLFW} ${lrcFS}px ${fM}`; return;
-                    case 1: cC.fillStyle = color.textT56, cC.font = `${oLFW} ${lrcFS-o10}px ${fM}`; return;
-                    case 2: cC.fillStyle = color.textT56, cC.font = `${oLFW} ${lrcFS-(lrcSSS?o15:o10)}px ${fM}`; return;
-                    case 3: default: cC.fillStyle = color.textT56, cC.font = `${oLFW} ${lrcFS-(lrcSSS?o20:o10)}px ${fM}`; return;
+                    case 1: cC.fillStyle = color.textT60, cC.font = `${oLFW} ${lrcFS-o10}px ${fM}`; return;
+                    case 2: cC.fillStyle = color.textT60, cC.font = `${oLFW} ${lrcFS-(lrcSSS?o15:o10)}px ${fM}`; return;
+                    case 3: default: cC.fillStyle = color.textT60, cC.font = `${oLFW} ${lrcFS-(lrcSSS?o20:o10)}px ${fM}`; return;
                 }
             } else {
                 switch (line) {
-                    case 0: cC.fillStyle = color.textT56, cC.font = `${tLFW} ${lrcFS-o5}px ${fT}`; return;
-                    case 1: cC.fillStyle = color.textT31, cC.font = `${tLFW} ${lrcFS-o15}px ${fT}`; return;
-                    case 2: cC.fillStyle = color.textT31, cC.font = `${tLFW} ${lrcFS-(lrcSSS?o20:o15)}px ${fT}`; return;
-                    case 3: default: cC.fillStyle = color.textT31, cC.font = `${tLFW} ${lrcFS-(lrcSSS?o25:o15)}px ${fT}`; return;
+                    case 0: cC.fillStyle = color.textT60, cC.font = `${tLFW} ${lrcFS-o5}px ${fT}`; return;
+                    case 1: cC.fillStyle = color.textT40, cC.font = `${tLFW} ${lrcFS-o15}px ${fT}`; return;
+                    case 2: cC.fillStyle = color.textT40, cC.font = `${tLFW} ${lrcFS-(lrcSSS?o20:o15)}px ${fT}`; return;
+                    case 3: default: cC.fillStyle = color.textT40, cC.font = `${tLFW} ${lrcFS-(lrcSSS?o25:o15)}px ${fT}`; return;
                 }
             }
         }
@@ -767,18 +802,19 @@ async function loadPiP(isToPiP=true, from="unknow") {
         }
     
         cC.font = `${gFW} ${o30}px ${f}`;
-        cC.fillStyle = color.textT56;
+        cC.fillStyle = color.textT60;
         let tW = cC.measureText(t).width
         cC.fillText(t, edgeM, cvSizeY+edgeM+o35); /*时间*/
     
         let pbMgT = cvSizeY+edgeM+o21p5, pbMgL = edgeM+tW+o30p5
-        cC.fillStyle = color.textT13;
+        cC.fillStyle = color.textT20;
         cC.fillRect(pbMgL, pbMgT, c.width-edgeM-pbMgL, o5); /*进度条背景*/
         cC.fillStyle = color.accent;
         cC.fillRect(pbMgL, pbMgT, (c.width-edgeM-pbMgL)*tP, o5); /*进度条*/
     
         /*背景*/
         if (readCfg.backgroundFrom == "AMLL"&&loadedPlugins["Apple-Musiclike-lyrics"]) {
+            nrNextTick = true
             let amllbgc = q(".amll-background-render-wrapper canvas")
             if (amllbgc) {
                 if (!amllbgv) {
@@ -813,7 +849,7 @@ async function loadPiP(isToPiP=true, from="unknow") {
             cC.globalCompositeOperation = "destination-out";
             cC.beginPath();
             cC.fillStyle = "#000";
-            cC.rect(cx-o1, cy-o1, w+o2, h+o2); /*外框(略大一圈，保证边缘擦干净)*/
+            cC.rect(0, 0, cx+w+o3, cy+h+o5); /*外框(大一圈，保证边缘擦干净，特别是动态背景下)*/
             /*封面圆角(四角)：外框减去圆角矩形，只擦掉四个角*/
             cC.moveTo(cx+rad, cy);
             cC.arcTo(cx+w, cy, cx+w, cy+h, rad);
@@ -829,9 +865,9 @@ async function loadPiP(isToPiP=true, from="unknow") {
             cC.drawImage(bgc, edgeM+cvSizeX, 0, c.width, edgeM+cvSizeY+o5, edgeM+cvSizeX, 0, c.width, edgeM+cvSizeY+o5); /*清除*/
             cC.fillStyle = color.text; cC.font = `${gFW} ${o55}px ${f}`;
             cC.fillText(song.name, txtMgL, o55+edgeM); /*主名*/
-            cC.fillStyle = color.textT31; cC.font = `${gFW} ${o35}px ${f}`;
+            cC.fillStyle = color.textT40; cC.font = `${gFW} ${o35}px ${f}`;
             cC.fillText(song.nameAnother, txtMgL, o105+edgeM); /*副名*/
-            cC.fillStyle = color.textT56;
+            cC.fillStyle = color.textT60;
             cC.fillText(song.artist, txtMgL, song.nameAnother==""?o105+edgeM:o150+edgeM); /*歌手*/
         }
         if (nrInfo) {
@@ -854,7 +890,6 @@ async function loadPiP(isToPiP=true, from="unknow") {
                     bgcC.fillStyle = color.bgT50;
                     bgcC.fillRect(0, 0, bgc.width, bgc.height);
                 }
-                cC.drawImage(bgc, 0, 0, cvSizeX+edgeM, cvSizeY+edgeM+o5, 0, 0, cvSizeX+edgeM, cvSizeY+edgeM+o5);
                 drawInfo();
                 if (!isCoverEmpty) {
                     cC.drawImage(cover, edgeM, edgeM, cvSizeX, cvSizeY);drawRC();
@@ -1192,10 +1227,6 @@ function getSettingsPage() {
         filter: invert(80%);
         color: var(--current-color);
         text-shadow: 0 0 1px var(--current-color);
-    }
-
-    #PiPWSettings .button + p {
-        line-height: 41px;
     }
 
     #PiPWSettings .textBox {
@@ -1552,14 +1583,14 @@ function getSettingsPage() {
     </div>
     <div class="subPart">
         <div class="subTitle"><p>歌词</p></div>
-        <p>歌词第二行显示</p>
+        <p>副歌词显示</p>
         <br />
         <div class="item">
             <label class="radio">
                 <input type="radio" name="lyricLine2Show" value="none" />
                 <span class="slider button"></span>
             </label>
-            <p>不要显示</p>
+            <p>无</p>
         </div>
         <div class="item">
             <label class="radio">
@@ -1573,7 +1604,7 @@ function getSettingsPage() {
                 <input type="radio" name="lyricLine2Show" value="translation" />
                 <span class="slider button"></span>
             </label>
-            <p>歌词翻译</p>
+            <p>翻译歌词</p>
         </div>
         <div class="item">
             <label class="radio">
@@ -1670,7 +1701,7 @@ function getSettingsPage() {
     </div>
     <div class="subPart">
         <div class="subTitle"><p>外观</p></div>
-        <p>颜色来源</p>
+        <p>配色来源</p>
         <br />
         <div class="item">
             <label class="radio">
@@ -1694,7 +1725,7 @@ function getSettingsPage() {
             <p>自定义</p>
         </div>
         <br />
-        <p>自定义颜色</p>
+        <p>自定义配色</p>
         <div style="height: 42px">
             <div class="item">
                 <label style="--current-color: ${readCfg.colorCustom_text}">
@@ -1721,14 +1752,14 @@ function getSettingsPage() {
                 </label>
             </div>
         </div>
-        <p>背景来源</p>
+        <p>背景</p>
         <br />
         <div class="item">
             <label class="radio">
                 <input type="radio" name="backgroundFrom" value="themeBackgroundColor" />
                 <span class="slider button"></span>
             </label>
-            <p>主题背景色</p>
+            <p>纯色</p>
         </div>
         <div class="item">
             <label class="radio">
@@ -1747,19 +1778,19 @@ function getSettingsPage() {
         </div>
         <br />
         <div class="item">
-            <p>全局字重 <a title='范围为1~1000，400相当于常规或中等，700相当于加粗，具体显示效果取决于字体'>?</a></p>
+            <p>全局字重 <a title='范围为1~1000，400相当于正常大小，700相当于加粗，具体显示效果取决于字体'>?</a></p>
             <br />
             <input class="button textBox" id="generalFontWeightSetBox" type="number" step="100" min="0" max="1000" placeholder='${cfgDefault.generalFontWeight}'
             value="${readCfg.generalFontWeight}" />
         </div>
         <div class="item">
-            <p>歌词(原文)字重</p>
+            <p>原歌词字重</p>
             <br />
             <input class="button textBox" id="originalLyricsFontWeightSetBox" type="number" step="100" min="0" max="1000" placeholder='${cfgDefault.originalLyricsFontWeight}'
             value="${readCfg.originalLyricsFontWeight}" />
         </div>
         <div class="item">
-            <p>歌词第二行字重</p>
+            <p>副歌词字重</p>
             <br />
             <input class="button textBox" id="translatedLyricsFontWeightSetBox" type="number" step="100" min="0" max="1000" placeholder='${cfgDefault.translatedLyricsFontWeight}'
             value="${readCfg.translatedLyricsFontWeight}" />
@@ -1783,6 +1814,11 @@ function getSettingsPage() {
             value="${readCfg.customJapaneseFonts.replaceAll("\"", "&quot;" )}" />
         <br />
         <input class="button" style="position: absolute; transform: translate(325px, -40px);" id="applyButton-customJapaneseFonts" type="button" value="应用" />
+        <p>封面圆角大小</p>
+        <br />
+        <input class="button textBox" id="coverCornerRadiusSetBox" type="number" step="1" placeholder='${cfgDefault.coverCornerRadius}'
+            value="${readCfg.coverCornerRadius}" />
+        <p>px</p>
     </div>
     <div class="subPart">
         <div class="subTitle"><p>渲染 (高级)</p></div>
@@ -1794,6 +1830,13 @@ function getSettingsPage() {
         <br />
         <p>窗口宽高比</p>
         <br />
+        <div class="item">
+            <label class="radio">
+                <input type="radio" name="aspectRatio" value="4:3" />
+                <span class="slider button"></span>
+            </label>
+            <p>4:3</p>
+        </div>
         <div class="item">
             <label class="radio">
                 <input type="radio" name="aspectRatio" value="16:9" />
@@ -1821,13 +1864,6 @@ function getSettingsPage() {
                 <span class="slider button"></span>
             </label>
             <p>24:9</p>
-        </div>
-        <div class="item">
-            <label class="radio">
-                <input type="radio" name="aspectRatio" value="3:1" />
-                <span class="slider button"></span>
-            </label>
-            <p>3:1</p>
         </div>
         <br />
         <p>渲染分辨率 (越小性能越好)</p>
