@@ -2,7 +2,7 @@
 **Copyright (C) 2024-2026 Lukoning
 */
 let rvN, reRatioTimer, winAspect, v, amllbgv/*Apple Music-like Lyrics Background Video*/, b/*(toggle)button*/, cP/*configPage*/, c/*canvas*/, bgc/*Background Canvas*/, cpc/*ColorPick() Canvas*/, cC/*...Context*/, bgcC, cpcC
-, cover, OcvUrl, cvUrl, cvUrlCache, OcvUrlCache, songDataCache, tMsT, lrcCache, pLrc, pLrcKeys, showRefreshing, thePiPWindow, curLdTxt, cvDrawn=false, lrcPrevC, lrcCurC, lrcOldC, lrcLastKey, lrcLastDy=0, lrcAnimStart=0, lrcAnimDy=0, nrNextTick=false
+, cover, OcvUrl, cvUrl, cvUrlCache, OcvUrlCache, songDataCache, tMsT, lrcCache, pLrc, pLrcKeys, showRefreshing, thePiPWindow, curLdTxt, cvDrawn=false, lrcPrevC, lrcCurC, lrcOldC, lrcLastKey, lrcLastDy=0, lrcAnimStart=0, lrcAnimDy=0, lrcLastBandH=0, lrcAnimBandH=0, nrNextTick=false
 , DontPlay=false, DontPause=false, autoRatio, autoRatioValue=480, lastReRatio=0, songIdCache=0, playProgress=0, nrLrc=false, lrcNowLoading=false, reRatioPending=false, isDynamicLyrics=false, isJp=false,debugMode=false
 , isVLsnAdded=false, isLrcRnpLsnAdded=false
 , t = "0:00 / 0:00", tC = 0, tT = 0, tP = 0, tR = 0 //显示用，Current，Total，PassedRate，Remaining
@@ -18,7 +18,7 @@ const pdd = "M21 3C21.5523 3 22 3.44772 22 4V11H20V5H4V19H10V21H3C2.44772 21 2 2
     , lyricLine2Show: "auto", dynamicLyrics: true, autoScroll: true, lyricsTaperOff: true, lyricsMask: false, lyricsTransition: true, lyricsHanzi2Kanji: true, lyricsOffset: 0, lyricsFrom: "LibLyric", lyricsCustomSources: "https://example.com/lyric?track=${track}&id=${trackId}&art=${artist}&arts=${artists}&album=${album}&albumId=${albumId}", showLyricsErrorTip: true
     , colorFrom: "albumCover", colorCustom_accent: "#FFFFFF", colorCustom_text: "#FFFFFF", colorCustom_bg: "#424242", backgroundFrom: "albumCoverBlur", generalFontWeight: 400, originalLyricsFontWeight: 700, translatedLyricsFontWeight: 400
     , customFonts: "\"Segoe UI\", \"Microsoft Yahei UI\", system-ui", useJapaneseFonts: true, customJapaneseFonts: "\"Yu Gothic UI\", \"Meiryo UI\", \"Microsoft Yahei UI\", system-ui", coverCornerRadius: 6 /*封面圆角默认为6px，比Win11窗口圆角(8px)略小，以获得视觉平衡*/
-    , smoothProgessBar: false, resolutionRatio: "auto", aspectRatio: "2:1", albumCoverSize: 160, useFullCover: false
+    , smoothProgessBar: false, animationFrameRate: "60", resolutionRatio: "auto", aspectRatio: "2:1", albumCoverSize: 160, useFullCover: false
     , customLoadingTxt: "正在载入猫猫…|猫猫正在赶来的路上…|马上就好了喵…"})
 , DcvUrl/*Default*/ = "orpheus://orpheus/style/res/common/discovery/calendar_bg.png"
 , discUrl = "orpheus://orpheus/style/res/default/default_play_disc.png"
@@ -60,6 +60,62 @@ async function tipMsg(m, t) {
         q(c+".z-hide").addEventListener("animationend", ()=>{q(c).remove()})
     }, 1200)
 }
+let progressUpdatedAt = 0, progressRunning = false, pipFrameWorker, pipFrameRAF = 0, pipCaptureTrack, lastPiPFrameTime = -Infinity;
+function pipFrameInterval() {
+    let rate = Number(readCfg.animationFrameRate);
+    return 1000 / ([15, 30, 60].includes(rate) ? rate : 60);
+}
+function currentPlayProgress() {
+    let elapsed = progressRunning ? Math.min(1000, Math.max(0, performance.now() - progressUpdatedAt)) : 0;
+    return Math.min(playProgress + elapsed, tT > 0 ? tT * 1000 : Infinity);
+}
+function syncPiPPlayback(playing) {
+    playProgress = currentPlayProgress();
+    progressUpdatedAt = performance.now();
+    progressRunning = playing;
+    updatePiPFrames();
+}
+function drawPiPFrame() {
+    if (document.pictureInPictureElement !== v || !v || v.paused) {updatePiPFrames(); return}
+    if (nrNextTick || readCfg.smoothProgessBar || readCfg.lyricsTransition) {
+        loadPiP(false, "AnimationFrame");
+    }
+}
+function updatePiPFrames() {
+    let active = v && document.pictureInPictureElement === v && !v.paused;
+    if (!active) {
+        if (pipFrameWorker) {pipFrameWorker.terminate(); pipFrameWorker = undefined}
+        cancelAnimationFrame(pipFrameRAF); pipFrameRAF = 0;
+        return;
+    }
+    if (pipFrameWorker || pipFrameRAF) return;
+    let url;
+    try {
+        url = URL.createObjectURL(new Blob([
+            'onmessage = e => setTimeout(() => postMessage(0), Math.ceil(e.data));'
+        ], {type: "text/javascript"}));
+        pipFrameWorker = new Worker(url);
+        pipFrameWorker.onmessage = () => {
+            drawPiPFrame();
+            if (pipFrameWorker) pipFrameWorker.postMessage(pipFrameInterval());
+        };
+        pipFrameWorker.onerror = () => {
+            if (pipFrameWorker) {pipFrameWorker.terminate(); pipFrameWorker = undefined}
+            startPiPFrameFallback();
+        };
+        pipFrameWorker.postMessage(pipFrameInterval());
+    } catch (e) {startPiPFrameFallback()}
+    finally {if (url) URL.revokeObjectURL(url)}
+}
+function startPiPFrameFallback() {
+    if (pipFrameRAF || !v || v.paused || document.pictureInPictureElement !== v) return;
+    function frame() {
+        drawPiPFrame();
+        if (v && !v.paused && document.pictureInPictureElement === v) pipFrameRAF = requestAnimationFrame(frame);
+        else pipFrameRAF = 0;
+    }
+    pipFrameRAF = requestAnimationFrame(frame);
+}
 function reRatio(rv) {
     rv = Number(rv)
     if (!isFinite(rv) || rv <= 0) {return} /*窗口关闭/过渡期间浏览器会报告高度0，不能当成分辨率，否则下次打开画布就是0x0，窗口一出来就消失*/
@@ -84,6 +140,10 @@ function reRatio(rv) {
 HTMLCanvasElement.prototype.toPiP = function(){
     if (!(v instanceof HTMLVideoElement)) {
         v = cE("video");
+        v.addEventListener("play", () => syncPiPPlayback(true));
+        v.addEventListener("pause", () => syncPiPPlayback(false));
+        v.addEventListener("enterpictureinpicture", updatePiPFrames);
+        v.addEventListener("leavepictureinpicture", updatePiPFrames);
         v.addEventListener("loadedmetadata", async()=>{
             try {
                 //请求小窗
@@ -142,12 +202,19 @@ HTMLCanvasElement.prototype.toPiP = function(){
         })
     }
     v.id = "PiPW-VideoE";
-    let cs = this.captureStream();
+    if (v.srcObject) v.srcObject.getTracks().forEach(track => track.stop());
+    let cs = this.captureStream(0);
+    pipCaptureTrack = cs.getVideoTracks()[0];
+    if (typeof pipCaptureTrack?.requestFrame !== "function") {
+        cs.getTracks().forEach(track => track.stop());
+        cs = this.captureStream(60); pipCaptureTrack = undefined;
+    }
     v.srcObject = cs; //刷新源
     v.controls = true; //调试用
     if(debugMode){DEBUG()}
     DontPlay=true; //解决打开小窗时自动播放的问题
     v.play() //否则黑窗
+    pipCaptureTrack?.requestFrame();
 }
 
 function pipToggle() {
@@ -266,7 +333,11 @@ async function loadPiP(isToPiP=true, from="unknow") {
     let PiPE = document.pictureInPictureElement;
     if (!isToPiP && !PiPE && !debugMode) return
     if (PiPE && PiPE.id != "PiPW-VideoE") {tipMsg("PiP窗口被占用", "err"); if(!debugMode){return}}
-    if (v?.paused) nrNextTick = false
+    let frameTime = performance.now();
+    if ((from === "AnimationFrame" || from.startsWith("PlayProgress")) && frameTime - lastPiPFrameTime < pipFrameInterval() - 0.5) return;
+    lastPiPFrameTime = frameTime;
+    nrNextTick = false
+    tC = currentPlayProgress() / 1000
     let startTime = Date.now();
     try {
         let nrInfo=false/*need re-*/, nrHead=false, chigai=false /*曲目不同以往(?)*/
@@ -391,7 +462,7 @@ async function loadPiP(isToPiP=true, from="unknow") {
             ],
             currentStartT: 0, // 当前歌词行开始时刻
             currentD: 0, // 当前歌词行持续时间
-        }), offset = readCfg.lyricsOffset*1000, progress = playProgress + offset;
+        }), offset = readCfg.lyricsOffset*1000, progress = currentPlayProgress() + offset;
         if (readCfg.lyricsFrom != "RNP") {
             document.removeEventListener("lyrics-updated", rnpLrcUpdate);
             isLrcRnpLsnAdded = false
@@ -625,24 +696,37 @@ async function loadPiP(isToPiP=true, from="unknow") {
         let lrcFS = o55, lrcMgT = o45, lrcMgL = edgeM, lrcMgR = edgeM, mLrcMgL = lrcMgL
         , lrcTop = cvSizeY+edgeM+lrcMgT
         , lrcSSS = readCfg.lyricsTaperOff;
-        let lrcLine = [lrcTop+lrcFS, lrcTop+lrcFS*2+o3*3, lrcTop+lrcFS*3+o3*4, lrcTop+lrcFS*4+o3*5]
+        function lyricFontSize(line=0, isT=false) {
+            let size = line === 0 ? lrcFS : lrcFS - (lrcSSS ? o(Math.min(line+1, 4)*5) : o10);
+            return isT ? size * 0.78 : size;
+        }
+        let lrcRows = [], lrcLine = [], rowTop = lrcTop + o5;
+        for (let line = 0; line < 5 && lrcRows.length < 5; line++) {
+            lrcRows.push({line, isT:false});
+            if (lyrics.T[line] !== "" && lrcRows.length < 5) lrcRows.push({line, isT:true});
+        }
+        for (let row = 0; row < lrcRows.length; row++) {
+            let entry = lrcRows[row], size = lyricFontSize(entry.line, entry.isT);
+            lrcLine.push(rowTop + size * 0.9);
+            rowTop += size * 1.10 + (lrcRows[row+1]?.isT ? o(8) : o(16));
+        }
+        let lyricBottom = c.height-o10, visibleRows = 0, blockBottom = lrcTop;
+        for (let row = 0; row < lrcRows.length; row++) {
+            let entry = lrcRows[row], bottom = lrcLine[row] + lyricFontSize(entry.line, entry.isT)*0.25;
+            if (bottom > lyricBottom) break;
+            visibleRows++; blockBottom = bottom;
+        }
+        let blockTop = lrcLine[0] - lyricFontSize()*0.9
+        , verticalOffset = Math.max(0, (lyricBottom-blockBottom - (blockTop-lrcTop))/2);
+        lrcLine = lrcLine.map(y => y+verticalOffset);
         function lyricStyle(line=0, isT=false, isU/*Unplayed*/=false) {
-            if (!isT) {
-                switch (line) {
-                    case 0: if (!isU) cC.fillStyle = color.text;
-                            else cC.fillStyle = color.textT50;
-                            cC.font = `${oLFW} ${lrcFS}px ${fM}`; return;
-                    case 1: cC.fillStyle = color.textT60, cC.font = `${oLFW} ${lrcFS-o10}px ${fM}`; return;
-                    case 2: cC.fillStyle = color.textT60, cC.font = `${oLFW} ${lrcFS-(lrcSSS?o15:o10)}px ${fM}`; return;
-                    case 3: default: cC.fillStyle = color.textT60, cC.font = `${oLFW} ${lrcFS-(lrcSSS?o20:o10)}px ${fM}`; return;
-                }
+            let size = lyricFontSize(line, isT);
+            if (isT) {
+                cC.fillStyle = line === 0 ? color.textT60 : color.textT40;
+                cC.font = tLFW + " " + size + "px " + fT;
             } else {
-                switch (line) {
-                    case 0: cC.fillStyle = color.textT60, cC.font = `${tLFW} ${lrcFS-o5}px ${fT}`; return;
-                    case 1: cC.fillStyle = color.textT40, cC.font = `${tLFW} ${lrcFS-o15}px ${fT}`; return;
-                    case 2: cC.fillStyle = color.textT40, cC.font = `${tLFW} ${lrcFS-(lrcSSS?o20:o15)}px ${fT}`; return;
-                    case 3: default: cC.fillStyle = color.textT40, cC.font = `${tLFW} ${lrcFS-(lrcSSS?o25:o15)}px ${fT}`; return;
-                }
+                cC.fillStyle = line === 0 ? (isU ? color.textT50 : color.text) : color.textT60;
+                cC.font = oLFW + " " + size + "px " + fM;
             }
         }
         function updateMLrcMgL(w, now) { //w是歌词行宽度，now是当前歌词行已播放百分比(动态歌词传入)
@@ -659,8 +743,10 @@ async function loadPiP(isToPiP=true, from="unknow") {
                         now = now>1?1:now
                     }
                 }
-                let lrcMgLOffset = w*now-lrcAreaW+o150 // o150 是当前播放位置与右边缘的距离
-                mLrcMgL = lrcMgL-(lrcMgLOffset>0?lrcMgLOffset:0)
+                let hold = Math.min(0.12, d > 0 ? 500/d : 0, lrcAreaW/w*0.25)
+                , scrollProgress = Number.isFinite(now) ? Math.max(0, Math.min(1, (now-hold)/(1-2*hold))) : 0
+                , lrcMgLOffset = (w-lrcAreaW)*scrollProgress;
+                mLrcMgL = lrcMgL-lrcMgLOffset
             }
         }
         
@@ -678,6 +764,8 @@ async function loadPiP(isToPiP=true, from="unknow") {
             layerCC.textAlign = "left";
             cC = layerCC;
         }
+        cC.save();
+        cC.beginPath(); cC.rect(lrcMgL, lrcY, Math.max(0, lrcW-lrcMgL-lrcMgR), Math.max(0, lrcH)); cC.clip();
         try {
             isDynamicLyrics = false
             if (Array.isArray(lyrics.M[0])) {
@@ -708,53 +796,18 @@ async function loadPiP(isToPiP=true, from="unknow") {
                 lyricStyle(); cC.fillText(lyrics.M[0], lrcMgL, lrcLine[0]); /*主歌词*/
             }
         
-            /*function drawLyrics(isT, realLine, showLine) {
-                lyricStyle(realLine, isT); cC.fillText(isT?lyrics.T[realLine]:lyrics.M[realLine], lrcMgL, lrcLine[showLine]-isT?o10:0);
-            }*/
-        
-        if (lyrics.T[0]!="") {
-            lyricStyle(0, true);
-            if (readCfg.lyricsFrom!="OriginalLyricBar") {
-                updateMLrcMgL(cC.measureText(lyrics.T[0]).width);
-            }
-            cC.fillText(lyrics.T[0], mLrcMgL, lrcLine[1]-o5); /*歌词翻译*/
-            lyricStyle(1); cC.fillText(lyrics.M[1], lrcMgL, lrcLine[2]); /*下1句主歌词*/
-            if (lyrics.T[1]!="") {
-                lyricStyle(1, true); cC.fillText(lyrics.T[1], lrcMgL, lrcLine[3]-o10); /*下1句歌词翻译*/
-                lyricStyle(2); cC.fillText(lyrics.M[2], lrcMgL, lrcLine[4]); /*下2句主歌词*/
-            } else {
-                lyricStyle(2); cC.fillText(lyrics.M[2], lrcMgL, lrcLine[3]); /*下2句主歌词*/
-                if (lyrics.T[2]!="") {
-                    lyricStyle(2, true); cC.fillText(lyrics.T[2], lrcMgL, lrcLine[4]-o10); /*下2句歌词翻译*/
-                } else {
-                    lyricStyle(3); cC.fillText(lyrics.M[3], lrcMgL, lrcLine[4]); /*下3句主歌词*/
+            for (let row = 1; row < visibleRows; row++) {
+                let entry = lrcRows[row];
+                lyricStyle(entry.line, entry.isT);
+                let text = entry.isT ? lyrics.T[entry.line] : lyrics.M[entry.line], x = lrcMgL;
+                if (entry.line === 0 && entry.isT && readCfg.lyricsFrom !== "OriginalLyricBar") {
+                    updateMLrcMgL(cC.measureText(text).width);
+                    x = mLrcMgL;
                 }
+                cC.fillText(text, x, lrcLine[row]);
             }
-        } else {
-            lyricStyle(1); cC.fillText(lyrics.M[1], lrcMgL, lrcLine[1]); /*下1句主歌词*/
-            if (lyrics.T[1]!="") {
-                lyricStyle(1, true); cC.fillText(lyrics.T[1], lrcMgL, lrcLine[2]-o10); /*下1句歌词翻译*/
-                lyricStyle(2); cC.fillText(lyrics.M[2], lrcMgL, lrcLine[3]); /*下2句主歌词*/
-                if (lyrics.T[2]!="") {
-                    lyricStyle(2, true); cC.fillText(lyrics.T[2], lrcMgL, lrcLine[4]-o10); /*下2句歌词翻译*/
-                } else {
-                    lyricStyle(3); cC.fillText(lyrics.M[3], lrcMgL, lrcLine[4]); /*下3句主歌词*/
-                }
-            } else {
-                lyricStyle(2); cC.fillText(lyrics.M[2], lrcMgL, lrcLine[2]); /*下2句主歌词*/
-                if (lyrics.T[2]!="") {
-                    lyricStyle(2, true); cC.fillText(lyrics.T[2], lrcMgL, lrcLine[3]-o10); /*下2句歌词翻译*/
-                    lyricStyle(3); cC.fillText(lyrics.M[3], lrcMgL, lrcLine[4]); /*下3句主歌词*/
-                } else {
-                    lyricStyle(3); cC.fillText(lyrics.M[3], lrcMgL, lrcLine[3]); /*下3句主歌词*/
-                    if (lyrics.T[3]!="") {
-                        lyricStyle(3, true); cC.fillText(lyrics.T[3], lrcMgL, lrcLine[4]-o10); /*下3句歌词翻译*/
-                    }
-                }
-            }
-        }
 
-        } finally {cC = realCC} /*无论歌词绘制是否出错，都必须切回主画布*/
+        } finally {cC.restore(); cC = realCC} /*无论歌词绘制是否出错，都必须切回主画布*/
 
         /*歌词换行过渡：新歌词整块(不透明)上滑到位；只有"刚离开的那一句"上滑并淡出。
           先于遮罩执行，遮罩在合成之后再盖，位置固定不动*/
@@ -772,13 +825,13 @@ async function loadPiP(isToPiP=true, from="unknow") {
                     oldCC.setTransform(1, 0, 0, 1, 0, 0);
                     oldCC.clearRect(0, 0, lrcW, lrcH);
                     oldCC.drawImage(lrcPrevC, 0, 0); /*上一帧的纯歌词图层 = 旧歌词*/
-                    lrcAnimStart = performance.now(); lrcAnimDy = lrcLastDy;
+                    lrcAnimStart = performance.now(); lrcAnimDy = lrcLastDy; lrcAnimBandH = lrcLastBandH;
                 }
                 let t = (performance.now() - lrcAnimStart) / 350;
                 if (lrcOldC && lrcAnimStart && t < 1 && lrcOldC.width==lrcW && lrcOldC.height==lrcH) {
                     animating = true;
                     let e = 1 - Math.pow(1 - t, 3) /*easeOutCubic*/
-                    , bandH = Math.min(lrcH, Math.round(lrcAnimDy + o3)); /*旧歌词里"刚离开的那一句"所在的高度*/
+                    , bandH = Math.min(lrcH, Math.round(lrcAnimBandH)); /*旧歌词里"刚离开的那一句"所在的高度*/
                     cC.save();
                     cC.beginPath(); cC.rect(0, lrcY, lrcW, lrcH); cC.clip();
                     cC.drawImage(layer, 0, lrcY + Math.round(lrcAnimDy*(1-e))); /*新歌词整块，不透明*/
@@ -788,6 +841,7 @@ async function loadPiP(isToPiP=true, from="unknow") {
                     nrNextTick = true
                 }
                 lrcLastKey = lrcKey; lrcLastDy = dy;
+                lrcLastBandH = (lyrics.T[0]!=="" ? lrcLine[2] : lrcLine[1]) - lyricFontSize(1)*0.9 - lrcY;
             } else {lrcLastKey = undefined}
             if (!animating) {cC.drawImage(layer, 0, lrcY)} /*没有过渡时，直接把歌词图层贴回主画布*/
             if (tracking) {let spare = lrcPrevC; lrcPrevC = layer; lrcCurC = spare} /*本帧图层留作"上一帧"，旧的那张留给下一帧重复使用(两张来回换，不反复新建画布)*/
@@ -916,6 +970,7 @@ async function loadPiP(isToPiP=true, from="unknow") {
             c.toPiP();
             nrHead=true;
         }
+        pipCaptureTrack?.requestFrame();
         let timeUsing = Date.now() - startTime;
         if(showRefreshing){console.log(`PiPW Log: <canvas>重绘完成，重绘用时${timeUsing==0?"<1":timeUsing}ms，当前分辨率${c.width}x${c.height}, 请求来自${from}`)}
     } catch (e) {
@@ -926,11 +981,11 @@ async function loadPiP(isToPiP=true, from="unknow") {
 plugin.onAllPluginsLoaded(()=>{load()});
 function load() {B();C();D();E();F()
     legacyNativeCmder.appendRegisterCall("PlayProgress", "audioplayer", (_, p) => {
-        playProgress = p*1000; let pZ = Math.floor(p)
+        playProgress = p*1000; progressUpdatedAt = performance.now(); let pZ = Math.floor(p)
         if (pZ>tC||p<tC) {tC = p; loadPiP(false, "PlayProgress")}
         else if (readCfg.smoothProgessBar) {tC = p; loadPiP(false, "PlayProgress - SmoothProgessBar")}
         else if (nrNextTick) {
-            nrNextTick = false; loadPiP(false, "PlayProgress - AnimationNextTick");
+            loadPiP(false, "PlayProgress - AnimationNextTick");
         }
         else if (readCfg.backgroundFrom=="AMLL" && loadedPlugins["Apple-Musiclike-lyrics"]) loadPiP(false, "PlayProgress - AMLLBackgroundUpdate")
     }); //requestAnimationFrame或setInterval会在网易云最小化后被优化，导致1FPS的感人帧率
@@ -1827,6 +1882,33 @@ function getSettingsPage() {
             <span class="slider button"></span>
         </label>
         <p>顺滑的进度条*</p>
+        <br />
+        <p>歌词动画刷新率（默认 60 FPS）</p>
+        <br />
+        <div class="item">
+            <label class="radio">
+                <input type="radio" name="animationFrameRate" value="15" />
+                <span class="slider button"></span>
+            </label>
+            <p>15 FPS</p>
+        </div>
+        <div class="item">
+            <label class="radio">
+                <input type="radio" name="animationFrameRate" value="30" />
+                <span class="slider button"></span>
+            </label>
+            <p>30 FPS</p>
+        </div>
+        <div class="item">
+            <label class="radio">
+                <input type="radio" name="animationFrameRate" value="60" />
+                <span class="slider button"></span>
+            </label>
+            <p>60 FPS</p>
+        </div>
+        <br />
+        <p>切换后生效，帧率越高越流畅相等的占用越高</p>
+        <p></p>
         <br />
         <p>窗口宽高比</p>
         <br />
